@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AttendQR</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ── Login overlay ── -->
+<div id="login-overlay">
+  <div id="login-box">
+    <div class="logo">
+      <div class="lm"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h2v2h-2zM18 14h3v2h-1v3h-3v-1h2v-2h-1zM14 18v3h3v-1h-2v-2z"/></svg></div>
+      Attend<em>QR</em>
+    </div>
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-family:var(--serif);font-size:22px">Lecturer login</div>
+      <div style="font-size:13px;color:var(--ink2);margin-top:4px">Sign in to access the admin panel</div>
+    </div>
+    <div id="login-err">Incorrect username or password.</div>
+    <div class="fi"><label>Username</label><input id="l-user" placeholder="Username" autocomplete="username"/></div>
+    <div class="fi" style="margin-bottom:20px"><label>Password</label><input id="l-pass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    <button class="btn btn-p" style="width:100%;justify-content:center;padding:10px;font-size:14px" onclick="doLogin()">Sign in</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     SCAN MODE — shown when URL has ?attend=XXXXXX
+     Student scans QR → phone opens this form automatically
+═══════════════════════════════════════════════════════ -->
+<div id="scan-mode" style="display:none">
+  <header>
+    <div class="hi">
+      <div class="logo">
+        <div class="lm"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h2v2h-2zM18 14h3v2h-1v3h-3v-1h2v-2h-1zM14 18v3h3v-1h-2v-2z"/></svg></div>
+        Attend<em>QR</em>
+      </div>
+    </div>
+  </header>
+  <main style="max-width:420px">
+    <div id="sm-alert" class="alert"></div>
+
+    <!-- Success view -->
+    <div id="sm-success" style="display:none">
+      <div class="card" style="text-align:center;padding:40px 28px">
+        <div class="scan-success-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div style="font-family:var(--serif);font-size:26px;margin-bottom:8px">You're marked!</div>
+        <div style="font-size:14px;color:var(--ink2)" id="sm-success-msg"></div>
+      </div>
+    </div>
+
+    <!-- Form view -->
+    <div id="sm-form">
+      <div class="sh">
+        <h1>Mark your <em>attendance</em></h1>
+        <p>Fill in your details to register for this session.</p>
+      </div>
+      <div id="sm-sess-card" class="card" style="display:none;padding:16px 20px;margin-bottom:14px">
+        <div class="cl" style="margin-bottom:8px">Session</div>
+        <div style="font-family:var(--serif);font-size:20px" id="sm-sess-name"></div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:3px" id="sm-sess-meta"></div>
+      </div>
+      <div id="sm-expired" class="alert alert-err" style="display:none;margin-bottom:14px">
+        This session has expired. Ask your instructor to regenerate the QR code.
+      </div>
+      <div class="card" id="sm-fill">
+        <div class="fi" style="margin-bottom:12px">
+          <label>Full Name</label>
+          <input id="sm-name" placeholder="Your full name" autocomplete="name"/>
+        </div>
+        <div class="fi" style="margin-bottom:20px">
+          <label>Roll Number / Student ID</label>
+          <input id="sm-roll" placeholder="e.g. CS2024001" autocomplete="off"/>
+        </div>
+        <button class="btn btn-p" style="width:100%;justify-content:center;padding:11px;font-size:14px" onclick="submitScan()">
+          Mark Attendance
+        </button>
+      </div>
+    </div>
+  </div><!-- /main -->
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN APP
+═══════════════════════════════════════════════════════ -->
+<div id="main-app" style="display:none">
+
+  <header>
+    <div class="hi">
+      <div class="logo">
+        <div class="lm"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h2v2h-2zM18 14h3v2h-1v3h-3v-1h2v-2h-1zM14 18v3h3v-1h-2v-2z"/></svg></div>
+        Attend<em>QR</em>
+      </div>
+      <nav>
+        <button class="nb on" id="nb-admin" onclick="showPage('admin')">Admin</button>
+        <button class="nb" id="nb-student" onclick="showPage('student')">Student</button>
+        <button class="nb" id="nb-records" onclick="showPage('records')">Records</button>
+        <button id="logout-btn" onclick="doLogout()">Sign out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ─── ADMIN ─── -->
+    <div class="page on" id="page-admin">
+      <div class="sh">
+        <h1>Start a <em>session</em></h1>
+        <p>Generate a timed QR code for your class. Students scan it to open the attendance form directly on their phone.</p>
+      </div>
+
+      <!-- Create form -->
+      <div class="card" id="form-card">
+        <div class="cl">Session details</div>
+        <div class="fg">
+          <div class="fi"><label>Subject / Class</label><input id="i-subject" placeholder="e.g. Mathematics 101"/></div>
+          <div class="fi"><label>Instructor</label><input id="i-instr" placeholder="e.g. Dr. Sharma"/></div>
+        </div>
+        <div class="fg">
+          <div class="fi"><label>Room / Location</label><input id="i-room" placeholder="e.g. Room 204"/></div>
+          <div class="fi"><label>QR valid for</label>
+            <select id="i-expiry">
+              <option value="120">2 minutes</option>
+              <option value="300" selected>5 minutes</option>
+              <option value="600">10 minutes</option>
+              <option value="900">15 minutes</option>
+              <option value="1800">30 minutes</option>
+              <option value="3600">60 minutes</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-p" onclick="generateSession()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h2v2h-2zM18 14h3v2h-1v3h-3v-1h2v-2h-1zM14 18v3h3v-1h-2v-2z"/></svg>
+          Generate QR Code
+        </button>
+      </div>
+
+      <!-- Live QR -->
+      <div class="card" id="qr-card" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+          <div class="cl" style="margin:0">Live session</div>
+          <span class="badge badge-a" id="sess-badge"><span class="bd"></span>Active</span>
+        </div>
+        <div class="qr-grid">
+          <div>
+            <div class="qr-frame" id="qr-frame"></div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:9px;max-width:185px;line-height:1.55">Scan with camera → opens attendance form on phone</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:0">
+            <div class="sess-title" id="qr-title"></div>
+            <div class="sess-meta" id="qr-meta"></div>
+            <div class="code-block">
+              <div class="code-lbl">Manual code (fallback)</div>
+              <div class="code-val" id="qr-code"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--ink3);margin-bottom:5px;letter-spacing:.2px">Time remaining</div>
+              <div class="tn" id="t-num">00:00</div>
+              <div class="tb"><div class="tf" id="t-fill"></div></div>
+              <div class="tlbl" id="t-lbl">Session active</div>
+            </div>
+            <div class="brow">
+              <button class="btn btn-o btn-sm" onclick="regenerateQR()">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3"/></svg>Regenerate
+              </button>
+              <button class="btn btn-o btn-sm" onclick="downloadQR()">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download
+              </button>
+              <button class="btn btn-d btn-sm" onclick="endSession()">End Session</button>
+            </div>
+          </div>
+        </div>
+        <div class="livebar">
+          <div class="livebar-l">Students marked present</div>
+          <div class="livebar-n" id="live-n">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── STUDENT ─── -->
+    <div class="page" id="page-student">
+      <div class="sh">
+        <h1>Mark <em>attendance</em></h1>
+        <p>Scan the QR on the board — your phone opens the form automatically. Or enter the code manually below.</p>
+      </div>
+      <div id="st-alert" class="alert"></div>
+      <div class="sl">
+        <div class="card">
+          <div class="cl">Your details</div>
+          <div class="fi" style="margin-bottom:12px"><label>Full Name</label><input id="st-name" placeholder="Your full name"/></div>
+          <div class="fi" style="margin-bottom:12px"><label>Roll Number / Student ID</label><input id="st-roll" placeholder="e.g. CS2024001"/></div>
+          <div class="fi" style="margin-bottom:20px">
+            <label>6-digit session code</label>
+            <input class="big-inp" id="st-code" maxlength="6" placeholder="000000" oninput="this.value=this.value.replace(/\D/g,'')"/>
+          </div>
+          <button class="btn btn-p" style="width:100%;justify-content:center;padding:10px;font-size:14px" onclick="markAttendance()">Mark Attendance</button>
+        </div>
+        <div>
+          <div id="no-sess" class="no-sess">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.5" style="display:block;margin:0 auto 10px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            No active session.<br/>Ask your instructor to start one.
+          </div>
+          <div id="act-sess" style="display:none" class="card" style="padding:18px">
+            <div class="cl">Active session</div>
+            <div style="font-family:var(--serif);font-size:19px" id="as-name"></div>
+            <div style="font-size:12px;color:var(--ink2);margin-top:3px" id="as-meta"></div>
+          </div>
+          <div class="hint" style="margin-top:12px">
+            <strong>Pro tip:</strong> On your phone, open your camera, aim at the QR code and tap the link notification. It opens this page in attendance form mode — no typing needed.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── RECORDS ─── -->
+    <div class="page" id="page-records">
+      <div class="sh">
+        <h1>Attendance <em>records</em></h1>
+        <p>All marked attendance across sessions. Export to CSV for your gradebook.</p>
+      </div>
+      <div class="sg">
+        <div class="sc"><div class="sn g" id="r-total">0</div><div class="slb">Total present</div></div>
+        <div class="sc"><div class="sn" id="r-sess">0</div><div class="slb">Sessions held</div></div>
+        <div class="sc"><div class="sn" id="r-today">0</div><div class="slb">Today</div></div>
+        <div class="sc"><div class="sn" id="r-uniq">0</div><div class="slb">Unique students</div></div>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <div class="tl">
+            <select class="flt" id="f-sess" onchange="renderTable()"><option value="">All sessions</option></select>
+            <select class="flt" id="f-sort" onchange="renderTable()">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name">Name A–Z</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-o btn-sm" onclick="exportCSV()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV
+            </button>
+            <button class="btn btn-d btn-sm" onclick="clearAll()">Clear all</button>
+          </div>
+        </div>
+        <div class="tw"><div id="tbl"></div></div>
+      </div>
+    </div>
+
+  </main>
+  <footer><strong>AttendQR</strong> — QR-based attendance for schools &amp; colleges. Runs entirely in your browser, no server needed.</footer>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
